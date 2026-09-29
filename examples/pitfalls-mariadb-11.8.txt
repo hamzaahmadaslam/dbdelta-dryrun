@@ -1,0 +1,44 @@
+dbdelta-dryrun: 9 tables from tests/fixtures/pitfalls.sql, MariaDB 11.8.6, WordPress 7.1.2
+10 statements dbDelta() runs on every call, 0 that stop after one run, 0 tables not created.
+
+Runs on every call (10)
+  {prefix}acme_alias.enabled  [type-alias]
+    ALTER TABLE {prefix}acme_alias CHANGE COLUMN `enabled` enabled boolean NOT NULL DEFAULT '0'
+    The SQL gives the type as "boolean" and the database reports "tinyint(1)". "boolean" is stored as "tinyint(1)", so the names never match.
+    Fix: Write the type the server reports: tinyint(1).
+  {prefix}acme_default.rate  [default-format]
+    ALTER TABLE {prefix}acme_default ALTER COLUMN `rate` SET DEFAULT '0'
+    The SQL gives DEFAULT '0' and the database reports '0.00'. The values are equal as numbers, but dbDelta() compares them as text.
+    Fix: Write the default as the database stores it: DEFAULT '0.00'.
+  {prefix}acme_enum.state  [enum-case]
+    ALTER TABLE {prefix}acme_enum CHANGE COLUMN `state` state enum('Open','Closed') NOT NULL DEFAULT 'Open'
+    The SQL gives the type as "enum('open','closed')" and the database reports "enum('Open','Closed')". dbDelta() lower-cases the type from the SQL but compares it with the database's type as reported, so values with capital letters never match.
+    Fix: Use lower-case values in the ENUM or SET, or keep this column out of dbDelta().
+  {prefix}acme_exists  [if-not-exists]
+    CREATE TABLE IF NOT EXISTS {prefix}acme_exists ( id bigint(20) unsigned NOT NULL AUTO_INCREMENT, PRIMARY KEY (id) ) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_520_ci
+    dbDelta() reads the word after CREATE TABLE as the table name, which is "IF" here. It cannot find a table called IF, so it runs the whole CREATE statement on every call and never compares the columns.
+    Fix: Write CREATE TABLE without IF NOT EXISTS: dbDelta() already skips tables that exist.
+  {prefix}acme_index (KEY email (email) USING BTREE)  [index-syntax]
+    ALTER TABLE {prefix}acme_index ADD `` (``)
+    dbDelta() cannot parse the index line "KEY email (email) USING BTREE" (a USING clause, a COMMENT or another option after the column list), so it never finds it on the table.
+    Fix: Write the index as KEY `name` (column, …) with nothing after the closing parenthesis.
+  {prefix}acme_json.settings  [type-alias]
+    ALTER TABLE {prefix}acme_json CHANGE COLUMN `settings` settings json
+    The SQL gives the type as "json" and the database reports "longtext". MariaDB stores JSON as LONGTEXT (MySQL has a native JSON type), so on MariaDB the names never match.
+    Fix: Write longtext if the plugin must run on MariaDB (and validate the JSON in PHP), or keep this column out of dbDelta() and create it once with its own ALTER TABLE.
+  {prefix}acme_oneline.lat  [two-columns-one-line]
+    ALTER TABLE {prefix}acme_oneline CHANGE COLUMN `lat` lat float, lng float
+    The SQL gives the type as "float," and the database reports "float". The line holds more than one column, and dbDelta() reads one column per line.
+    Fix: Put each column on its own line.
+  {prefix}acme_spaces.price  [space-in-type]
+    ALTER TABLE {prefix}acme_spaces CHANGE COLUMN `price` price decimal(10, 2) NOT NULL DEFAULT '0.00'
+    The SQL gives the type as "decimal(10," and the database reports "decimal(10,2)". dbDelta() reads the type up to the first space, and this type has a space inside its parentheses.
+    Fix: Remove the spaces inside the parentheses: decimal(10,2).
+  {prefix}acme_width.id  [int-display-width]
+    ALTER TABLE {prefix}acme_width CHANGE COLUMN `id` id int unsigned NOT NULL AUTO_INCREMENT
+    The SQL gives the type as "int unsigned" and the database reports "int(10) unsigned". Only the display width differs. WordPress ignores that difference on MySQL 8.0.17 and later, but not on MariaDB 11.8.6.
+    Fix: Write the width the server reports, "int(10) unsigned": MySQL 8.0.17 and later ignore it, and it matches MariaDB.
+  {prefix}acme_width.total  [int-display-width]
+    ALTER TABLE {prefix}acme_width CHANGE COLUMN `total` total int NOT NULL DEFAULT '0'
+    The SQL gives the type as "int" and the database reports "int(11)". Only the display width differs. WordPress ignores that difference on MySQL 8.0.17 and later, but not on MariaDB 11.8.6.
+    Fix: Write the width the server reports, "int(11)": MySQL 8.0.17 and later ignore it, and it matches MariaDB.

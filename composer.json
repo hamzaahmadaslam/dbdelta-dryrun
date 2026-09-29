@@ -1,0 +1,20 @@
+{
+    "name": "hamzaahmadaslam/dbdelta-dryrun",
+    "description": "A WP-CLI command that creates CREATE TABLE statements under a scratch prefix, runs dbDelta() again and reports every ALTER it would repeat on each call, with the cause and the fix.",
+    "type": "wp-cli-package",
+    "license": "MIT",
+    "homepage": "https://github.com/hamzaahmadaslam/dbdelta-dryrun",
+    "authors": [
+        {
+            "name": "Hamza Ahmad Aslam",
+            "homepage": "https://hamzaahmadaslam.com"
+        }
+    ],
+    "keywords": ["wordpress", "wp-cli", "dbdelta", "mysql", "mariadb", "database", "schema"],
+    "require": {
+        "php": ">=7.4"
+    },
+    "autoload": {
+        "files": ["command.php"]
+    }
+}

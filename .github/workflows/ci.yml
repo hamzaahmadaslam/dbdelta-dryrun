@@ -1,0 +1,59 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - name: Syntax
+        run: |
+          set -e
+          for f in command.php src/*.php tests/*.php tests/fixtures/*.php; do php -l "$f"; done
+          bash -n tests/integration.sh
+      - name: Unit tests
+        run: php tests/run.php
+
+  integration:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        db: ["mysql:8.4", "mariadb:10.11", "mariadb:11.8"]
+    services:
+      db:
+        image: ${{ matrix.db }}
+        env:
+          # A throwaway container that lives for this job only.
+          MYSQL_ROOT_PASSWORD: root
+          MYSQL_DATABASE: wordpress
+          MARIADB_ROOT_PASSWORD: root
+          MARIADB_DATABASE: wordpress
+        ports:
+          - 3306:3306
+        options: >-
+          --health-cmd="mysqladmin ping -h 127.0.0.1 -proot || mariadb-admin ping -h 127.0.0.1 -proot"
+          --health-interval=5s --health-timeout=5s --health-retries=30
+    steps:
+      - uses: actions/checkout@v7
+      - name: WP-CLI and WordPress 7.1.2
+        run: |
+          set -e
+          php -m | grep -qi mysqli
+          mkdir -p "$HOME/bin"
+          curl -sSfL -o "$HOME/bin/wp" https://github.com/wp-cli/wp-cli/releases/download/v2.12.0/wp-cli-2.12.0.phar
+          chmod +x "$HOME/bin/wp"
+          echo "$HOME/bin" >> "$GITHUB_PATH"
+          export PATH="$HOME/bin:$PATH"
+          wp core download --version=7.1.2 --path="$RUNNER_TEMP/wp"
+          wp config create --path="$RUNNER_TEMP/wp" --dbname=wordpress --dbuser=root --dbpass=root --dbhost=127.0.0.1
+          wp core install --path="$RUNNER_TEMP/wp" --url=http://localhost --title=Scratch --admin_user=scratch --admin_email=scratch@example.com --skip-email
+      - name: Integration tests
+        run: WP_PATH="$RUNNER_TEMP/wp" bash tests/integration.sh

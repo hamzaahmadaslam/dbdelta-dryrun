@@ -1,0 +1,141 @@
+{
+    "source": "tests/fixtures/pitfalls.sql",
+    "server": {
+        "name": "MariaDB",
+        "version": "11.8.6",
+        "mariadb": true
+    },
+    "scratch": "dbddexample_",
+    "tables": [
+        {
+            "table": "{prefix}acme_width",
+            "error": ""
+        },
+        {
+            "table": "{prefix}acme_enum",
+            "error": ""
+        },
+        {
+            "table": "{prefix}acme_spaces",
+            "error": ""
+        },
+        {
+            "table": "{prefix}acme_default",
+            "error": ""
+        },
+        {
+            "table": "{prefix}acme_alias",
+            "error": ""
+        },
+        {
+            "table": "{prefix}acme_oneline",
+            "error": ""
+        },
+        {
+            "table": "{prefix}acme_index",
+            "error": ""
+        },
+        {
+            "table": "{prefix}acme_json",
+            "error": ""
+        },
+        {
+            "table": "{prefix}acme_exists",
+            "error": ""
+        }
+    ],
+    "results": [
+        {
+            "status": "loops",
+            "statement": "ALTER TABLE {prefix}acme_alias CHANGE COLUMN `enabled` enabled boolean NOT NULL DEFAULT '0'",
+            "kind": "type",
+            "target": "{prefix}acme_alias.enabled",
+            "cause": "type-alias",
+            "detail": "The SQL gives the type as \"boolean\" and the database reports \"tinyint(1)\". \"boolean\" is stored as \"tinyint(1)\", so the names never match.",
+            "fix": "Write the type the server reports: tinyint(1)."
+        },
+        {
+            "status": "loops",
+            "statement": "ALTER TABLE {prefix}acme_default ALTER COLUMN `rate` SET DEFAULT '0'",
+            "kind": "default",
+            "target": "{prefix}acme_default.rate",
+            "cause": "default-format",
+            "detail": "The SQL gives DEFAULT '0' and the database reports '0.00'. The values are equal as numbers, but dbDelta() compares them as text.",
+            "fix": "Write the default as the database stores it: DEFAULT '0.00'."
+        },
+        {
+            "status": "loops",
+            "statement": "ALTER TABLE {prefix}acme_enum CHANGE COLUMN `state` state enum('Open','Closed') NOT NULL DEFAULT 'Open'",
+            "kind": "type",
+            "target": "{prefix}acme_enum.state",
+            "cause": "enum-case",
+            "detail": "The SQL gives the type as \"enum('open','closed')\" and the database reports \"enum('Open','Closed')\". dbDelta() lower-cases the type from the SQL but compares it with the database's type as reported, so values with capital letters never match.",
+            "fix": "Use lower-case values in the ENUM or SET, or keep this column out of dbDelta()."
+        },
+        {
+            "status": "loops",
+            "statement": "CREATE TABLE IF NOT EXISTS {prefix}acme_exists (\n  id bigint(20) unsigned NOT NULL AUTO_INCREMENT,\n  PRIMARY KEY  (id)\n) DEFAULT CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_520_ci",
+            "kind": "table",
+            "target": "{prefix}acme_exists",
+            "cause": "if-not-exists",
+            "detail": "dbDelta() reads the word after CREATE TABLE as the table name, which is \"IF\" here. It cannot find a table called IF, so it runs the whole CREATE statement on every call and never compares the columns.",
+            "fix": "Write CREATE TABLE without IF NOT EXISTS: dbDelta() already skips tables that exist."
+        },
+        {
+            "status": "loops",
+            "statement": "ALTER TABLE {prefix}acme_index ADD  `` (``)",
+            "kind": "index",
+            "target": "{prefix}acme_index (KEY email (email) USING BTREE)",
+            "cause": "index-syntax",
+            "detail": "dbDelta() cannot parse the index line \"KEY email (email) USING BTREE\" (a USING clause, a COMMENT or another option after the column list), so it never finds it on the table.",
+            "fix": "Write the index as KEY `name` (column, \u2026) with nothing after the closing parenthesis."
+        },
+        {
+            "status": "loops",
+            "statement": "ALTER TABLE {prefix}acme_json CHANGE COLUMN `settings` settings json",
+            "kind": "type",
+            "target": "{prefix}acme_json.settings",
+            "cause": "type-alias",
+            "detail": "The SQL gives the type as \"json\" and the database reports \"longtext\". MariaDB stores JSON as LONGTEXT (MySQL has a native JSON type), so on MariaDB the names never match.",
+            "fix": "Write longtext if the plugin must run on MariaDB (and validate the JSON in PHP), or keep this column out of dbDelta() and create it once with its own ALTER TABLE."
+        },
+        {
+            "status": "loops",
+            "statement": "ALTER TABLE {prefix}acme_oneline CHANGE COLUMN `lat` lat float, lng float",
+            "kind": "type",
+            "target": "{prefix}acme_oneline.lat",
+            "cause": "two-columns-one-line",
+            "detail": "The SQL gives the type as \"float,\" and the database reports \"float\". The line holds more than one column, and dbDelta() reads one column per line.",
+            "fix": "Put each column on its own line."
+        },
+        {
+            "status": "loops",
+            "statement": "ALTER TABLE {prefix}acme_spaces CHANGE COLUMN `price` price decimal(10, 2) NOT NULL DEFAULT '0.00'",
+            "kind": "type",
+            "target": "{prefix}acme_spaces.price",
+            "cause": "space-in-type",
+            "detail": "The SQL gives the type as \"decimal(10,\" and the database reports \"decimal(10,2)\". dbDelta() reads the type up to the first space, and this type has a space inside its parentheses.",
+            "fix": "Remove the spaces inside the parentheses: decimal(10,2)."
+        },
+        {
+            "status": "loops",
+            "statement": "ALTER TABLE {prefix}acme_width CHANGE COLUMN `id` id int unsigned NOT NULL AUTO_INCREMENT",
+            "kind": "type",
+            "target": "{prefix}acme_width.id",
+            "cause": "int-display-width",
+            "detail": "The SQL gives the type as \"int unsigned\" and the database reports \"int(10) unsigned\". Only the display width differs. WordPress ignores that difference on MySQL 8.0.17 and later, but not on MariaDB 11.8.6.",
+            "fix": "Write the width the server reports, \"int(10) unsigned\": MySQL 8.0.17 and later ignore it, and it matches MariaDB."
+        },
+        {
+            "status": "loops",
+            "statement": "ALTER TABLE {prefix}acme_width CHANGE COLUMN `total` total int NOT NULL DEFAULT '0'",
+            "kind": "type",
+            "target": "{prefix}acme_width.total",
+            "cause": "int-display-width",
+            "detail": "The SQL gives the type as \"int\" and the database reports \"int(11)\". Only the display width differs. WordPress ignores that difference on MySQL 8.0.17 and later, but not on MariaDB 11.8.6.",
+            "fix": "Write the width the server reports, \"int(11)\": MySQL 8.0.17 and later ignore it, and it matches MariaDB."
+        }
+    ],
+    "ignored": [],
+    "wordpress": "7.1.2"
+}
