@@ -3,7 +3,7 @@
     "description": "A WP-CLI command that creates CREATE TABLE statements under a scratch prefix, runs dbDelta() again and reports every ALTER it would repeat on each call, with the cause and the fix.",
     "type": "wp-cli-package",
     "license": "MIT",
-    "homepage": "https://github.com/hamzaahmadaslam/dbdelta-dryrun",
+    "homepage": "https://hamzaahmadaslam.com/open-source/dbdelta-dryrun",
     "authors": [
         {
             "name": "Hamza Ahmad Aslam",
